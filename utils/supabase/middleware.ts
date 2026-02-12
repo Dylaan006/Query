@@ -51,8 +51,17 @@ export async function updateSession(request: NextRequest) {
 
         return response
     } catch (e) {
-        // If you are here, a Supabase client could not be created!
-        // This is likely because the environment variables are not set.
+        // If Supabase client fails (e.g. missing env vars), strictly redirect to login
+        // to prevent access to protected routes in a broken state.
+        if (
+            !request.nextUrl.pathname.startsWith('/login') &&
+            !request.nextUrl.pathname.startsWith('/auth')
+        ) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/login'
+            return NextResponse.redirect(url)
+        }
+
         return NextResponse.next({
             request: {
                 headers: request.headers,
