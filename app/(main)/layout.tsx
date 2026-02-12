@@ -7,18 +7,30 @@ export default async function MainLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const supabase = await createClient()
+    let folders = [];
+    let rootNotes = [];
 
-    const { data: folders } = await supabase
-        .from('folders')
-        .select('*, notes(*)')
-        .order('created_at', { ascending: true })
+    try {
+        const supabase = await createClient()
 
-    const { data: rootNotes } = await supabase
-        .from('notes')
-        .select('*')
-        .is('folder_id', null)
-        .order('created_at', { ascending: true })
+        const { data: foldersData } = await supabase
+            .from('folders')
+            .select('*, notes(*)')
+            .order('created_at', { ascending: true })
+
+        if (foldersData) folders = foldersData;
+
+        const { data: rootNotesData } = await supabase
+            .from('notes')
+            .select('*')
+            .is('folder_id', null)
+            .order('created_at', { ascending: true })
+
+        if (rootNotesData) rootNotes = rootNotesData;
+    } catch (error) {
+        console.error("Failed to fetch sidebar data:", error);
+        // Fallback to empty states to prevent crash
+    }
 
     return (
         <main className="flex h-full w-full">
