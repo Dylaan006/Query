@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
-import { MDXEditor, headingsPlugin, listsPlugin, quotePlugin, thematicBreakPlugin, markdownShortcutPlugin } from '@mdxeditor/editor'
+import React, { forwardRef } from 'react';
+import { MDXEditor, headingsPlugin, listsPlugin, quotePlugin, thematicBreakPlugin, markdownShortcutPlugin, MDXEditorMethods } from '@mdxeditor/editor'
 
-export default function InitializedMDXEditor({ markdown, onChange }: { markdown: string, onChange?: (markdown: string) => void }) {
+const InitializedMDXEditor = forwardRef<MDXEditorMethods, { markdown: string, onChange?: (markdown: string) => void }>(({ markdown, onChange }, ref) => {
     return (
-        <div className="prose dark:prose-invert max-w-none">
+        <div className="prose dark:prose-invert max-w-none note-content">
             <MDXEditor
+                ref={ref}
                 markdown={markdown}
                 onChange={onChange}
                 plugins={[
@@ -20,4 +21,7 @@ export default function InitializedMDXEditor({ markdown, onChange }: { markdown:
             />
         </div>
     );
-}
+});
+
+InitializedMDXEditor.displayName = 'InitializedMDXEditor';
+export default InitializedMDXEditor;

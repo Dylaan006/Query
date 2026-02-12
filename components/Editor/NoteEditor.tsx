@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import MDXEditorComponent from './MDXEditorComponent';
 import { updateNoteTitle, updateNoteContent } from '@/app/(main)/actions';
+import { MDXEditorMethods } from '@mdxeditor/editor';
 
 // Simple debounce implementation
 function useDebounce<T extends (...args: any[]) => any>(callback: T, delay: number) {
@@ -36,6 +37,7 @@ export default function NoteEditor({
     initialContent: string
 }) {
     const [title, setTitle] = useState(initialTitle);
+    const editorRef = useRef<MDXEditorMethods>(null);
 
     // Create debounced update functions
     const debouncedUpdateTitle = useDebounce((newTitle: string) => {
@@ -52,6 +54,13 @@ export default function NoteEditor({
         debouncedUpdateTitle(newTitle);
     };
 
+    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            editorRef.current?.focus();
+        }
+    };
+
     const handleContentChange = (newContent: string) => {
         debouncedUpdateContent(newContent);
     };
@@ -66,10 +75,12 @@ export default function NoteEditor({
                     type="text"
                     value={title}
                     onChange={handleTitleChange}
+                    onKeyDown={handleTitleKeyDown}
                 />
 
                 {/* Body */}
                 <MDXEditorComponent
+                    ref={editorRef}
                     markdown={initialContent || ''}
                     onChange={handleContentChange}
                 />

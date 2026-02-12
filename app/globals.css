@@ -44,3 +44,16 @@
     opacity: 0;
   }
 }
+
+/* Editor Refinements */
+.note-content p {
+  margin-bottom: 0.5em;
+  margin-top: 0.5em;
+}
+
+/* Ensure lists don't have huge gaps either */
+.note-content ul,
+.note-content ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
