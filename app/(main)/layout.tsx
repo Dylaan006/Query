@@ -2,6 +2,8 @@ import React from 'react';
 import SidebarController from '@/components/Sidebar/SidebarController';
 import { createClient } from '@/utils/supabase/server';
 
+export const dynamic = 'force-dynamic';
+
 export default async function MainLayout({
     children,
 }: {
