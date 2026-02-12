@@ -8,45 +8,55 @@ export async function updateSession(request: NextRequest) {
         },
     })
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll()
+    try {
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll()
+                    },
+                    setAll(cookiesToSet) {
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            request.cookies.set(name, value)
+                        )
+                        response = NextResponse.next({
+                            request: {
+                                headers: request.headers,
+                            },
+                        })
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            response.cookies.set(name, value, options)
+                        )
+                    },
                 },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        request.cookies.set(name, value)
-                    )
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
-                    )
-                },
-            },
+            }
+        )
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+
+        if (
+            !user &&
+            !request.nextUrl.pathname.startsWith('/login') &&
+            !request.nextUrl.pathname.startsWith('/auth')
+        ) {
+            // no user, potentially respond by redirecting the user to the login page
+            const url = request.nextUrl.clone()
+            url.pathname = '/login'
+            return NextResponse.redirect(url)
         }
-    )
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (
-        !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth')
-    ) {
-        // no user, potentially respond by redirecting the user to the login page
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
+        return response
+    } catch (e) {
+        // If you are here, a Supabase client could not be created!
+        // This is likely because the environment variables are not set.
+        return NextResponse.next({
+            request: {
+                headers: request.headers,
+            },
+        })
     }
-
-    return response
 }
