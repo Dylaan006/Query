@@ -5,131 +5,172 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export async function createFolder() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-        return { error: 'Unauthorized' }
+        if (!user) {
+            return { error: 'Unauthorized' }
+        }
+
+        const { error } = await supabase.from('folders').insert({
+            name: 'New Folder',
+            user_id: user.id
+        })
+
+        if (error) {
+            console.error('Error creating folder:', error)
+            return { error: 'Failed to create folder' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in createFolder:', error)
+        return { error: 'Unexpected error occurred' }
     }
-
-    const { error } = await supabase.from('folders').insert({
-        name: 'New Folder',
-        user_id: user.id
-    })
-
-    if (error) {
-        console.error('Error creating folder:', error)
-        return { error: 'Failed to create folder' }
-    }
-
-    revalidatePath('/', 'layout')
 }
 
 export async function createNote(folderId?: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    let newNoteId: string | null = null;
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-        return { error: 'Unauthorized' }
+        if (!user) {
+            return { error: 'Unauthorized' }
+        }
+
+        const { data, error } = await supabase.from('notes').insert({
+            title: 'Untitled Note',
+            user_id: user.id,
+            folder_id: folderId || null
+        }).select().single()
+
+        if (error) {
+            console.error('Error creating note:', error)
+            return { error: 'Failed to create note' }
+        }
+
+        newNoteId = data.id;
+    } catch (error) {
+        console.error('Unexpected error in createNote:', error)
+        return { error: 'Unexpected error occurred' }
     }
 
-    // If no folderId, maybe create in a default folder or handle it (for now, specific folder required logic or root notes logic)
-    // The schema requires folder_id? No, schema says folder_id references folders on delete cascade, but doesn't say NOT NULL.
-    // Wait, let's check schema. Step 75: folder_id uuid references folders... (nullable by default).
-
-    const { data, error } = await supabase.from('notes').insert({
-        title: 'Untitled Note',
-        user_id: user.id,
-        folder_id: folderId || null
-    }).select().single()
-
-    if (error) {
-        console.error('Error creating note:', error)
-        return { error: 'Failed to create note' }
-    }
-
-    revalidatePath('/', 'layout')
-    if (data) {
-        redirect(`/notes/${data.id}`)
+    if (newNoteId) {
+        revalidatePath('/', 'layout')
+        redirect(`/notes/${newNoteId}`)
     }
 }
 
 export async function updateNoteContent(noteId: string, content: string) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const { error } = await supabase.from('notes').update({
-        content,
-        // Schema in step 75: id, created_at, title, content, folder_id, user_id.
-        // I should create a migration for updated_at if I want it, but for now just content.
-    }).eq('id', noteId)
+        const { error } = await supabase.from('notes').update({
+            content,
+        }).eq('id', noteId)
 
-    if (error) {
-        return { error: 'Failed to update note' }
+        if (error) {
+            return { error: 'Failed to update note' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in updateNoteContent:', error)
+        return { error: 'Unexpected error occurred' }
     }
-
-    revalidatePath('/', 'layout')
 }
 
 export async function updateNoteTitle(noteId: string, title: string) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const { error } = await supabase.from('notes').update({
-        title
-    }).eq('id', noteId)
+        const { error } = await supabase.from('notes').update({
+            title
+        }).eq('id', noteId)
 
-    revalidatePath('/', 'layout')
+        if (error) {
+            return { error: 'Failed to update title' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in updateNoteTitle:', error)
+        return { error: 'Unexpected error occurred' }
+    }
 }
 
 export async function moveNoteToFolder(noteId: string, folderId: string | null) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const { error } = await supabase.from('notes').update({
-        folder_id: folderId
-    }).eq('id', noteId)
+        const { error } = await supabase.from('notes').update({
+            folder_id: folderId
+        }).eq('id', noteId)
 
-    if (error) {
-        console.error('Error moving note:', error)
-        return { error: 'Failed to move note' }
+        if (error) {
+            console.error('Error moving note:', error)
+            return { error: 'Failed to move note' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in moveNoteToFolder:', error)
+        return { error: 'Unexpected error occurred' }
     }
-
-    revalidatePath('/', 'layout')
 }
 
 export async function deleteNote(noteId: string) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const { error } = await supabase.from('notes').delete().eq('id', noteId)
+        const { error } = await supabase.from('notes').delete().eq('id', noteId)
 
-    if (error) {
-        console.error('Error deleting note:', error)
-        return { error: 'Failed to delete note' }
+        if (error) {
+            console.error('Error deleting note:', error)
+            return { error: 'Failed to delete note' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in deleteNote:', error)
+        return { error: 'Unexpected error occurred' }
     }
-
-    revalidatePath('/', 'layout')
 }
 
 export async function deleteFolder(folderId: string) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const { error } = await supabase.from('folders').delete().eq('id', folderId)
+        const { error } = await supabase.from('folders').delete().eq('id', folderId)
 
-    if (error) {
-        console.error('Error deleting folder:', error)
-        return { error: 'Failed to delete folder' }
+        if (error) {
+            console.error('Error deleting folder:', error)
+            return { error: 'Failed to delete folder' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in deleteFolder:', error)
+        return { error: 'Unexpected error occurred' }
     }
-
-    revalidatePath('/', 'layout')
 }
 
 export async function renameFolder(folderId: string, name: string) {
-    const supabase = await createClient()
+    try {
+        const supabase = await createClient()
 
-    const { error } = await supabase.from('folders').update({ name }).eq('id', folderId)
+        const { error } = await supabase.from('folders').update({ name }).eq('id', folderId)
 
-    if (error) {
-        console.error('Error renaming folder:', error)
-        return { error: 'Failed to rename folder' }
+        if (error) {
+            console.error('Error renaming folder:', error)
+            return { error: 'Failed to rename folder' }
+        }
+
+        revalidatePath('/', 'layout')
+    } catch (error) {
+        console.error('Unexpected error in renameFolder:', error)
+        return { error: 'Unexpected error occurred' }
     }
-
-    revalidatePath('/', 'layout')
 }
