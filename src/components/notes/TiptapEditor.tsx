@@ -5,10 +5,12 @@ import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Bold, Italic, List, ListOrdered, CheckSquare, Quote, Save } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, CheckSquare, Quote, Save, CheckCircle2 } from 'lucide-react'
+import { TodoistTaskNode } from './TodoistTaskNode'
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@supabase/ssr'
+import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database.types'
 
 // Custom debounce hook
@@ -27,32 +29,34 @@ function useDebouncedCallback<T extends (...args: any[]) => any>(
     };
 }
 
-const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start writing..." }: { content?: string, onChange?: (content: string) => void, placeholder?: string }) => {
+const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start writing...", noteId }: { content?: string, onChange?: (content: string) => void, placeholder?: string, noteId?: string }) => {
     const [isSaving, setIsSaving] = useState(false);
     const queryClient = useQueryClient();
-    const supabase = createBrowserClient<Database>(
+    const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    ) as SupabaseClient<Database>;
 
     // Fetch Note
     const { data: note, isLoading } = useQuery({
-        queryKey: ['note'],
+        queryKey: ['note', noteId], // distinct query key per note
         queryFn: async () => {
+            // If no noteId, don't fetch anything (or handle create mode)
+            if (!noteId) return null;
+
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return null;
 
             const { data, error } = await supabase
                 .from('notes')
                 .select('*')
-                .eq('user_id', user.id)
-                .order('updated_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+                .eq('id', noteId)
+                .single();
 
             if (error) throw error;
             return data;
-        }
+        },
+        enabled: !!noteId
     });
 
     // Save Mutation
@@ -61,17 +65,17 @@ const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start 
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("No user");
 
-            if (note?.id) {
+            if ((note as any)?.id) {
                 // Update
-                const { error } = await supabase
-                    .from('notes')
+                const { error } = await (supabase
+                    .from('notes') as any)
                     .update({ content, updated_at: new Date().toISOString() })
-                    .eq('id', note.id);
+                    .eq('id', (note as any).id);
                 if (error) throw error;
             } else {
                 // Insert
-                const { error } = await supabase
-                    .from('notes')
+                const { error } = await (supabase
+                    .from('notes') as any)
                     .insert({ content, user_id: user.id });
                 if (error) throw error;
             }
@@ -106,6 +110,7 @@ const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start 
             Placeholder.configure({
                 placeholder: placeholder,
             }),
+            TodoistTaskNode,
         ],
         content: '', // content handled via effect
         onUpdate: ({ editor }) => {
@@ -123,8 +128,8 @@ const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start 
 
     // Load content when data is ready
     useEffect(() => {
-        if (editor && note?.content && !editor.getText()) { // Only load if editor empty to avoid overwrite loop
-            editor.commands.setContent(note.content);
+        if (editor && (note as any)?.content && !editor.getText()) { // Only load if editor empty to avoid overwrite loop
+            editor.commands.setContent((note as any).content);
         } else if (editor && initialContent && !note && !editor.getText()) {
             editor.commands.setContent(initialContent);
         }
@@ -183,6 +188,13 @@ const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start 
                         title="Quote"
                     >
                         <Quote className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => editor.chain().focus().insertContent({ type: 'todoistTask', attrs: { content: 'New Todoist Task' } }).run()}
+                        className={`p-2 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400`}
+                        title="Add Todoist Task"
+                    >
+                        <CheckCircle2 className="w-4 h-4 text-red-500" />
                     </button>
                 </div>
                 <div className="flex items-center px-2">

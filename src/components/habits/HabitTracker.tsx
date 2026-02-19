@@ -8,7 +8,8 @@ import { CheckCircle, XCircle, Flame, Plus, Trash2 } from 'lucide-react';
 import 'react-day-picker/dist/style.css';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/database.types';
+import { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database.types';
 
 // Database Types
 type HabitRecord = {
@@ -16,16 +17,15 @@ type HabitRecord = {
     name: string;
     streak: number; // Calculated on client
     completedDates: string[]; // Calculated on client
-    habit_logs: { date: string }[];
 }
 
 export default function HabitTracker() {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
     const queryClient = useQueryClient();
-    const supabase = createBrowserClient<Database>(
+    const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    ) as SupabaseClient<Database>;
 
     // Fetch Habits
     const { data: habits = [], isLoading } = useQuery({
@@ -90,13 +90,13 @@ export default function HabitTracker() {
                 const { error } = await supabase
                     .from('habit_logs')
                     .delete()
-                    .eq('id', existing.id);
+                    .eq('id', (existing as any).id);
                 if (error) throw error;
             } else {
                 // Insert
                 const { error } = await supabase
                     .from('habit_logs')
-                    .insert({ habit_id: habitId, date });
+                    .insert({ habit_id: habitId, date } as any);
                 if (error) throw error;
             }
         },
@@ -144,7 +144,7 @@ export default function HabitTracker() {
             const { error } = await supabase.from('habits').insert({
                 name,
                 user_id: user.id
-            });
+            } as any);
             if (error) throw error;
         },
         onSettled: () => {

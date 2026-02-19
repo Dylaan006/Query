@@ -72,6 +72,7 @@ export interface Database {
                     content: string | null // HTML/JSON content from Tiptap
                     title: string | null
                     user_id: string | null
+                    parent_folder_id: string | null
                 }
                 Insert: {
                     id?: string
@@ -80,6 +81,7 @@ export interface Database {
                     content?: string | null
                     title?: string | null
                     user_id?: string | null
+                    parent_folder_id?: string | null
                 }
                 Update: {
                     id?: string
@@ -88,6 +90,30 @@ export interface Database {
                     content?: string | null
                     title?: string | null
                     user_id?: string | null
+                    parent_folder_id?: string | null
+                }
+            }
+            folders: {
+                Row: {
+                    id: string
+                    created_at: string
+                    name: string
+                    parent_id: string | null
+                    user_id: string
+                }
+                Insert: {
+                    id?: string
+                    created_at?: string
+                    name: string
+                    parent_id?: string | null
+                    user_id: string
+                }
+                Update: {
+                    id?: string
+                    created_at?: string
+                    name?: string
+                    parent_id?: string | null
+                    user_id?: string
                 }
             }
         }

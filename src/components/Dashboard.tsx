@@ -10,6 +10,7 @@ import Sidebar from "@/components/sidebar/Sidebar";
 import SecondarySidebar from "@/components/sidebar/SecondarySidebar";
 import Section from "@/components/ui/Section";
 import { Button } from '@/components/ui/Button';
+import FileExplorer from "@/components/notes/FileExplorer";
 
 type Tab = 'tasks' | 'notes' | 'calendar' | 'habits';
 
@@ -17,6 +18,7 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
     const [activeTab, setActiveTab] = useState<Tab>('tasks');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState<string>('inbox'); // 'inbox', 'today', 'upcoming', or projectId
+    const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
     return (
         <div className="flex h-screen bg-zinc-900 overflow-hidden dark">
@@ -57,7 +59,7 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
                                 activeTab={activeTab}
                                 onTabChange={(tab) => {
                                     setActiveTab(tab as Tab);
-                                    if (tab !== 'tasks') setIsMobileMenuOpen(false);
+                                    if (tab !== 'tasks' && tab !== 'notes') setIsMobileMenuOpen(false);
                                 }}
                                 className="static h-full border-r-0"
                             />
@@ -73,6 +75,18 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
                                     />
                                 </div>
                             )}
+                            {activeTab === 'notes' && (
+                                <div className="flex-1 bg-zinc-900 border-l border-zinc-800">
+                                    <FileExplorer
+                                        className="w-full border-none"
+                                        activeNoteId={selectedNoteId}
+                                        onSelectNote={(id) => {
+                                            setSelectedNoteId(id);
+                                            setIsMobileMenuOpen(false);
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </motion.div>
                     </>
                 )}
@@ -80,24 +94,34 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
 
             {/* Secondary Sidebar (Contextual Navigation) - Desktop */}
             <AnimatePresence mode="wait">
-                {activeTab === 'tasks' && (
+                {(activeTab === 'tasks' || activeTab === 'notes') && (
                     <motion.div
                         initial={{ width: 0, opacity: 0 }}
                         animate={{ width: 'auto', opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}
                         className="ml-20 h-full border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 backdrop-blur-xl z-40 hidden md:block"
                     >
-                        <SecondarySidebar
-                            activeFilter={activeFilter}
-                            onFilterChange={setActiveFilter}
-                        />
+                        {activeTab === 'tasks' && (
+                            <SecondarySidebar
+                                activeFilter={activeFilter}
+                                onFilterChange={setActiveFilter}
+                            />
+                        )}
+                        {activeTab === 'notes' && (
+                            <div className="w-64 h-full bg-zinc-900 border-r border-zinc-800">
+                                <FileExplorer
+                                    activeNoteId={selectedNoteId}
+                                    onSelectNote={setSelectedNoteId}
+                                />
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Main Content Area */}
-            <main className={`flex-1 h-full overflow-y-auto transition-all duration-300 p-4 md:p-8 pt-20 md:pt-8 ${activeTab !== 'tasks' ? 'md:ml-20' : ''}`}>
-                <div className="max-w-5xl mx-auto">
+            <main className={`flex-1 h-full overflow-y-auto transition-all duration-300 p-4 md:p-8 pt-20 md:pt-8 ${activeTab !== 'tasks' && activeTab !== 'notes' ? 'md:ml-20' : ''}`}>
+                <div className="max-w-5xl mx-auto h-full">
                     <AnimatePresence mode="wait">
                         {activeTab === 'tasks' && (
                             <Section key="tasks" title="" subtitle="">
@@ -109,16 +133,19 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
                         )}
 
                         {activeTab === 'notes' && (
-                            <Section key="notes" title="Notes" subtitle="Capture your thoughts">
-                                <div className="max-w-3xl mx-auto space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h2 className="text-xl font-medium text-zinc-800 dark:text-zinc-100">Daily Journal</h2>
-                                        <span className="text-xs text-zinc-400">Auto-saved</span>
-                                    </div>
-                                    <TiptapEditor
-                                        content="<h2>Thinking...</h2><p>Start your daily brain dump here.</p>"
-                                        placeholder="Write something brilliant..."
-                                    />
+                            <Section key="notes" title={selectedNoteId ? "" : "Notes"} subtitle={selectedNoteId ? "" : "Select a note to start editing"}>
+                                <div className="h-full flex flex-col">
+                                    {selectedNoteId ? (
+                                        <TiptapEditor
+                                            key={selectedNoteId} // Force re-mount on note change
+                                            noteId={selectedNoteId}
+                                            placeholder="Write something brilliant..."
+                                        />
+                                    ) : (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-zinc-400">
+                                            <p>Select a note from the explorer</p>
+                                        </div>
+                                    )}
                                 </div>
                             </Section>
                         )}
