@@ -12,14 +12,17 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import { cn } from "@/lib/utils";
+
 type Tab = 'tasks' | 'notes' | 'calendar' | 'habits';
 
 interface SidebarProps {
     activeTab: Tab;
     onTabChange: (tab: Tab) => void;
+    className?: string;
 }
 
-export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export default function Sidebar({ activeTab, onTabChange, className }: SidebarProps) {
     const navItems = [
         { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
         { id: 'notes', icon: FileText, label: 'Notes' },
@@ -28,7 +31,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     ];
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-20 flex flex-col items-center py-8 bg-zinc-900 border-r border-zinc-800 z-50 transition-all duration-300">
+        <aside className={cn("fixed left-0 top-0 h-screen w-20 flex flex-col items-center py-8 bg-zinc-900 border-r border-zinc-800 z-50 transition-all duration-300", className)}>
             {/* Brand / Logo */}
             <div className="mb-10 p-3 bg-[var(--brand)] rounded-xl shadow-lg shadow-[var(--brand)]/40">
                 <Home className="w-6 h-6 text-white" />

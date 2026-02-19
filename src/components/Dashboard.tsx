@@ -53,10 +53,14 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
                             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
                             className="fixed inset-y-0 left-0 w-80 bg-zinc-900 z-50 md:hidden flex"
                         >
-                            <Sidebar activeTab={activeTab} onTabChange={(tab) => {
-                                setActiveTab(tab as Tab);
-                                if (tab !== 'tasks') setIsMobileMenuOpen(false);
-                            }} />
+                            <Sidebar
+                                activeTab={activeTab}
+                                onTabChange={(tab) => {
+                                    setActiveTab(tab as Tab);
+                                    if (tab !== 'tasks') setIsMobileMenuOpen(false);
+                                }}
+                                className="static h-full border-r-0"
+                            />
                             {activeTab === 'tasks' && (
                                 <div className="flex-1 bg-zinc-900 border-l border-zinc-800">
                                     <SecondarySidebar
