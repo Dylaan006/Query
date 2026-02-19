@@ -8,7 +8,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { Bold, Italic, List, ListOrdered, CheckSquare, Quote, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/database.types'
 
 // Custom debounce hook
@@ -30,7 +30,10 @@ function useDebouncedCallback<T extends (...args: any[]) => any>(
 const TiptapEditor = ({ content: initialContent, onChange, placeholder = "Start writing..." }: { content?: string, onChange?: (content: string) => void, placeholder?: string }) => {
     const [isSaving, setIsSaving] = useState(false);
     const queryClient = useQueryClient();
-    const supabase = createClientComponentClient<Database>();
+    const supabase = createBrowserClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     // Fetch Note
     const { data: note, isLoading } = useQuery({

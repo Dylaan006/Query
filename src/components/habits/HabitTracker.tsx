@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, XCircle, Flame, Plus, Trash2 } from 'lucide-react';
 import 'react-day-picker/dist/style.css';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/database.types';
 
 // Database Types
@@ -22,7 +22,10 @@ type HabitRecord = {
 export default function HabitTracker() {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
     const queryClient = useQueryClient();
-    const supabase = createClientComponentClient<Database>();
+    const supabase = createBrowserClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     // Fetch Habits
     const { data: habits = [], isLoading } = useQuery({
