@@ -4,57 +4,173 @@ import { useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import dayjs from 'dayjs';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, Flame } from 'lucide-react';
+import { CheckCircle, XCircle, Flame, Plus, Trash2 } from 'lucide-react';
 import 'react-day-picker/dist/style.css';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/database.types';
 
-// Mock data storage for habits (in a real app, uses Supabase)
-interface Habit {
+// Database Types
+type HabitRecord = {
     id: string;
     name: string;
-    streak: number;
-    completedDates: string[]; // ISO date strings YYYY-MM-DD
+    streak: number; // Calculated on client
+    completedDates: string[]; // Calculated on client
+    habit_logs: { date: string }[];
 }
 
-const initialHabits: Habit[] = [
-    { id: '1', name: 'Workout', streak: 5, completedDates: [dayjs().format('YYYY-MM-DD')] },
-    { id: '2', name: 'Read 20 mins', streak: 12, completedDates: [] },
-    { id: '3', name: 'Meditation', streak: 3, completedDates: [] },
-];
-
 export default function HabitTracker() {
-    const [habits, setHabits] = useState<Habit[]>(initialHabits);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+    const queryClient = useQueryClient();
+    const supabase = createClientComponentClient<Database>();
+
+    // Fetch Habits
+    const { data: habits = [], isLoading } = useQuery({
+        queryKey: ['habits'],
+        queryFn: async () => {
+            const { data: habitsData, error: habitsError } = await supabase
+                .from('habits')
+                .select('*, habit_logs(date)')
+                .order('created_at', { ascending: true });
+
+            if (habitsError) throw habitsError;
+
+            // Transform data structure
+            return habitsData.map((habit: any) => {
+                const completedDates = habit.habit_logs.map((log: any) => log.date);
+
+                // Calculate streak (simplified)
+                let streak = 0;
+                const sortedDates = [...completedDates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+                let currentDate = dayjs();
+
+                // Check if today is done, if not, check yesterday to start streak
+                if (sortedDates.includes(currentDate.format('YYYY-MM-DD'))) {
+                    streak++;
+                    currentDate = currentDate.subtract(1, 'day');
+                } else {
+                    if (sortedDates.includes(currentDate.subtract(1, 'day').format('YYYY-MM-DD'))) {
+                        currentDate = currentDate.subtract(1, 'day');
+                    } else {
+                        // Streak broken
+                    }
+                }
+
+                while (sortedDates.includes(currentDate.format('YYYY-MM-DD'))) {
+                    streak++;
+                    currentDate = currentDate.subtract(1, 'day');
+                }
+
+                return {
+                    id: habit.id,
+                    name: habit.name,
+                    streak,
+                    completedDates
+                };
+            });
+        }
+    });
+
+    // Toggle Mutation
+    const toggleMutation = useMutation({
+        mutationFn: async ({ habitId, date }: { habitId: string, date: string }) => {
+            // Check if exists
+            const { data: existing } = await supabase
+                .from('habit_logs')
+                .select('*')
+                .eq('habit_id', habitId)
+                .eq('date', date)
+                .maybeSingle();
+
+            if (existing) {
+                // Delete
+                const { error } = await supabase
+                    .from('habit_logs')
+                    .delete()
+                    .eq('id', existing.id);
+                if (error) throw error;
+            } else {
+                // Insert
+                const { error } = await supabase
+                    .from('habit_logs')
+                    .insert({ habit_id: habitId, date });
+                if (error) throw error;
+            }
+        },
+        onMutate: async ({ habitId, date }) => {
+            // Optimistic Update
+            await queryClient.cancelQueries({ queryKey: ['habits'] });
+            const previousHabits = queryClient.getQueryData(['habits']);
+
+            queryClient.setQueryData(['habits'], (old: HabitRecord[] | undefined) => {
+                if (!old) return [];
+                return old.map(h => {
+                    if (h.id !== habitId) return h;
+                    const exists = h.completedDates.includes(date);
+                    return {
+                        ...h,
+                        completedDates: exists
+                            ? h.completedDates.filter(d => d !== date)
+                            : [...h.completedDates, date]
+                    };
+                });
+            });
+
+            return { previousHabits };
+        },
+        onError: (err, newTodo, context) => {
+            queryClient.setQueryData(['habits'], context?.previousHabits);
+            console.error("Failed to toggle habit", err);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['habits'] });
+        }
+    });
 
     const toggleHabit = (habitId: string, date: Date) => {
         const dateStr = dayjs(date).format('YYYY-MM-DD');
-
-        setHabits(prev => prev.map(habit => {
-            if (habit.id !== habitId) return habit;
-
-            const isCompleted = habit.completedDates.includes(dateStr);
-            let newDates = [...habit.completedDates];
-            let newStreak = habit.streak;
-
-            if (isCompleted) {
-                newDates = newDates.filter(d => d !== dateStr);
-                // Simplified streak logic for demo
-                newStreak = Math.max(0, newStreak - 1);
-            } else {
-                newDates.push(dateStr);
-                newStreak += 1;
-            }
-
-            return { ...habit, completedDates: newDates, streak: newStreak };
-        }));
+        toggleMutation.mutate({ habitId, date: dateStr });
     };
+
+    // New Habit Mutation
+    const createHabitMutation = useMutation({
+        mutationFn: async (name: string) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("No user");
+
+            const { error } = await supabase.from('habits').insert({
+                name,
+                user_id: user.id
+            });
+            if (error) throw error;
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['habits'] });
+        }
+    });
+
+    const handleCreateHabit = () => {
+        const name = prompt("Enter habit name:");
+        if (name) createHabitMutation.mutate(name);
+    };
+
+    const deleteHabitMutation = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase.from('habits').delete().eq('id', id);
+            if (error) throw error;
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['habits'] });
+        }
+    });
+
 
     const getDayContent = (day: Date) => {
         const dateStr = dayjs(day).format('YYYY-MM-DD');
-        const completedCount = habits.filter(h => h.completedDates.includes(dateStr)).length;
+        const completedCount = habits.filter((h: HabitRecord) => h.completedDates.includes(dateStr)).length;
         const totalHabits = habits.length;
 
-        // Calculate intensity based on completion
-        if (completedCount === 0) return null;
+        if (totalHabits === 0 || completedCount === 0) return null;
 
         const intensity = completedCount / totalHabits;
         let colorClass = 'bg-red-100 dark:bg-red-900/30';
@@ -66,6 +182,8 @@ export default function HabitTracker() {
         );
     };
 
+    if (isLoading) return <div className="p-8 text-center text-zinc-500">Loading habits...</div>;
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 w-full">
             {/* Calendar Section */}
@@ -76,7 +194,7 @@ export default function HabitTracker() {
                         selected={selectedDate}
                         onSelect={setSelectedDate}
                         modifiers={{
-                            hasHabits: (date) => habits.some(h => h.completedDates.includes(dayjs(date).format('YYYY-MM-DD')))
+                            hasHabits: (date) => habits.some((h: HabitRecord) => h.completedDates.includes(dayjs(date).format('YYYY-MM-DD')))
                         }}
                         modifiersClassNames={{
                             selected: 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
@@ -100,14 +218,28 @@ export default function HabitTracker() {
                     <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">
                         Habits for {dayjs(selectedDate).format('MMMM D, YYYY')}
                     </h3>
-                    <span className="text-sm text-zinc-400">
-                        {habits.filter(h => h.completedDates.includes(dayjs(selectedDate).format('YYYY-MM-DD'))).length}/{habits.length} completed
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-zinc-400 mr-2">
+                            {habits.filter((h: HabitRecord) => h.completedDates.includes(dayjs(selectedDate).format('YYYY-MM-DD'))).length}/{habits.length} completed
+                        </span>
+                        <button
+                            onClick={handleCreateHabit}
+                            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                            title="Add Habit"
+                        >
+                            <Plus className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-3">
                     <AnimatePresence>
-                        {habits.map((habit) => {
+                        {habits.length === 0 && (
+                            <div className="text-center py-8 text-zinc-500 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                                No habits tracked yet. Click + to add one.
+                            </div>
+                        )}
+                        {habits.map((habit: HabitRecord) => {
                             const isCompleted = habit.completedDates.includes(dayjs(selectedDate).format('YYYY-MM-DD'));
                             return (
                                 <motion.div
@@ -115,7 +247,7 @@ export default function HabitTracker() {
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     className={`
-                                flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer
+                                flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer group
                                 ${isCompleted
                                             ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'
                                             : 'bg-white dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}
@@ -139,6 +271,16 @@ export default function HabitTracker() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Delete habit?')) deleteHabitMutation.mutate(habit.id);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-400 hover:text-red-500 transition-all"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </motion.div>
                             );
                         })}
