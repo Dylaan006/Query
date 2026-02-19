@@ -106,7 +106,7 @@ export default function FileExplorer({ onSelectNote, activeNoteId, className }: 
             if (error) throw error;
             return data;
         },
-        onSuccess: (data) => {
+        onSuccess: (data: any) => {
             queryClient.invalidateQueries({ queryKey: ['fileSystem'] });
             if (data) onSelectNote(data.id);
         }
@@ -121,9 +121,9 @@ export default function FileExplorer({ onSelectNote, activeNoteId, className }: 
             const table = type === 'folder' ? 'folders' : 'notes';
             const column = type === 'folder' ? 'parent_id' : 'parent_folder_id';
 
-            const { error } = await supabase
-                .from(table)
-                .update({ [column]: parentId } as any)
+            const { error } = await (supabase
+                .from(table) as any)
+                .update({ [column]: parentId })
                 .eq('id', id);
 
             if (error) throw error;

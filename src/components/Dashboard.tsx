@@ -120,8 +120,8 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
             </AnimatePresence>
 
             {/* Main Content Area */}
-            <main className={`flex-1 h-full overflow-y-auto transition-all duration-300 p-4 md:p-8 pt-20 md:pt-8 ${activeTab !== 'tasks' && activeTab !== 'notes' ? 'md:ml-20' : ''}`}>
-                <div className="max-w-5xl mx-auto h-full">
+            <main className={`flex-1 h-full overflow-y-auto transition-all duration-300 ${activeTab !== 'notes' ? 'p-4 md:p-8 pt-20 md:pt-8' : ''} ${activeTab !== 'tasks' && activeTab !== 'notes' ? 'md:ml-20' : ''}`}>
+                <div className={`h-full ${activeTab !== 'notes' ? 'max-w-5xl mx-auto' : ''}`}>
                     <AnimatePresence mode="wait">
                         {activeTab === 'tasks' && (
                             <Section key="tasks" title="" subtitle="">
@@ -133,13 +133,20 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
                         )}
 
                         {activeTab === 'notes' && (
-                            <Section key="notes" title={selectedNoteId ? "" : "Notes"} subtitle={selectedNoteId ? "" : "Select a note to start editing"}>
+                            <motion.div
+                                key="notes"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="h-full"
+                            >
                                 <div className="h-full flex flex-col">
                                     {selectedNoteId ? (
                                         <TiptapEditor
                                             key={selectedNoteId} // Force re-mount on note change
                                             noteId={selectedNoteId}
                                             placeholder="Write something brilliant..."
+                                            onDelete={() => setSelectedNoteId(null)}
                                         />
                                     ) : (
                                         <div className="flex-1 flex flex-col items-center justify-center text-zinc-400">
@@ -147,7 +154,7 @@ export default function Dashboard({ initialTasks = [] }: { initialTasks?: any[] 
                                         </div>
                                     )}
                                 </div>
-                            </Section>
+                            </motion.div>
                         )}
 
                         {activeTab === 'calendar' && (
