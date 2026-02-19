@@ -35,6 +35,7 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 interface FileExplorerProps {
     onSelectNote: (noteId: string) => void;
@@ -49,6 +50,7 @@ type FolderNode = Database['public']['Tables']['folders']['Row'] & {
 
 export default function FileExplorer({ onSelectNote, activeNoteId, className }: FileExplorerProps) {
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+    const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -109,6 +111,20 @@ export default function FileExplorer({ onSelectNote, activeNoteId, className }: 
         onSuccess: (data: any) => {
             queryClient.invalidateQueries({ queryKey: ['fileSystem'] });
             if (data) onSelectNote(data.id);
+        }
+    });
+
+    const deleteFolderMutation = useMutation({
+        mutationFn: async (folderId: string) => {
+            const { error } = await supabase
+                .from('folders')
+                .delete()
+                .eq('id', folderId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['fileSystem'] });
+            setFolderToDelete(null);
         }
     });
 
@@ -284,27 +300,42 @@ export default function FileExplorer({ onSelectNote, activeNoteId, className }: 
                             </span>
                             <Folder className="w-4 h-4 text-zinc-400 fill-zinc-400/20" />
                             <span className="flex-1 truncate">{folder.name}</span>
-                            <button
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded"
-                                onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    const name = prompt("New Folder inside " + folder.name);
-                                    if (name) createFolderMutation.mutate({ name, parentId: folder.id });
-                                }}
-                            >
-                                <Plus className="w-3 h-3" />
-                            </button>
-                            <button
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded"
-                                onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    createNoteMutation.mutate({ title: 'New Note', parentId: folder.id });
-                                }}
-                            >
-                                <FileText className="w-3 h-3" />
-                            </button>
+                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded mr-1"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const name = prompt("New Folder inside " + folder.name);
+                                        if (name) createFolderMutation.mutate({ name, parentId: folder.id });
+                                    }}
+                                    title="New Subfolder"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                </button>
+                                <button
+                                    className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded mr-1"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        createNoteMutation.mutate({ title: 'New Note', parentId: folder.id });
+                                    }}
+                                    title="New Note"
+                                >
+                                    <FileText className="w-3 h-3" />
+                                </button>
+                                <button
+                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-500 rounded"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFolderToDelete(folder.id);
+                                    }}
+                                    title="Delete Folder"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </div>
                         </div>
                     </DraggableItem>
                 </DroppableFolder>
@@ -374,6 +405,19 @@ export default function FileExplorer({ onSelectNote, activeNoteId, className }: 
 
                 <DragOverlay>
                 </DragOverlay>
+
+                <ConfirmationModal
+                    isOpen={!!folderToDelete}
+                    onClose={() => setFolderToDelete(null)}
+                    onConfirm={() => {
+                        if (folderToDelete) deleteFolderMutation.mutate(folderToDelete);
+                    }}
+                    title="Delete Folder"
+                    message="Are you sure you want to delete this folder? All contents inside will be deleted."
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    variant="danger"
+                />
             </div>
         </DndContext>
     );
